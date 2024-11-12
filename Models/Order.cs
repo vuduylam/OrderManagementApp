@@ -8,7 +8,7 @@ namespace OrderManagementApp.Models
     {
         [Key]
         public int order_id { get; set; }
-        //[ForeignKey("Customer")]
+        [ForeignKey("Customer")]
         public int customer_id { get; set; }
         public DateOnly order_date { get; set;  }
 
