@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.Extensions.Hosting;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.Contracts;
 
@@ -28,6 +29,6 @@ namespace OrderManagementApp.Models
         public string Country { get; set; } = string.Empty;
 
         //Navigation properties
-        //public ICollection<Order> orders { get; set; } = new List<Order>();
+        public ICollection<Order> Orders { get; } = new List<Order>();
     }
 }

@@ -20,5 +20,8 @@ namespace OrderManagementApp.Models
         [Column("price")]
         public decimal Price { get; set; }
 
+        //Navigation properties
+        public ICollection<OrderDetail> OrderDetails { get; } = new List<OrderDetail>();
+        public Category? Category { get; set; } = null!;
     }
 }

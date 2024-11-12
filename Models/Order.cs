@@ -16,6 +16,7 @@ namespace OrderManagementApp.Models
         public DateOnly OrderDate { get; set;  }
 
         //Navigation properties
-        //public Customer? customer { get; set; }
+        public Customer? Customer { get; set; }
+        public ICollection<OrderDetail> OrderDetails { get; } = new List<OrderDetail>();
     }
 }

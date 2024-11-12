@@ -15,5 +15,7 @@ namespace OrderManagementApp.Models
         [Column("description")]
         public string Description { get; set; } = string.Empty;
         
+        //Navigation properties
+        public ICollection<Product> Products { get; } = new List<Product>();
     }
 }
