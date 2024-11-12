@@ -1,15 +1,19 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace OrderManagementApp.Models
 {
     public class Category
     {
-        [Key]
-        [Required]
-        public int category_id { get; set; }
-        public string category_name { get; set; } = string.Empty;
-        public string description { get; set; } = string.Empty;
+        [Key] [Required] [Column("category_id")]
+        public int CategoryId { get; set; }
+
+        [Column("category_name")]
+        public string CategoryName { get; set; } = string.Empty;
+
+        [Column("description")]
+        public string Description { get; set; } = string.Empty;
         
     }
 }

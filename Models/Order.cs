@@ -6,11 +6,14 @@ namespace OrderManagementApp.Models
 {
     public class Order
     {
-        [Key]
-        public int order_id { get; set; }
-        [ForeignKey("Customer")]
-        public int customer_id { get; set; }
-        public DateOnly order_date { get; set;  }
+        [Key] [Column("order_id")]
+        public int OrderId { get; set; }
+        
+        [ForeignKey("Customer")] [Column("customer_id")]
+        public int CustomerId { get; set; }
+        
+        [Column("order_date")]
+        public DateOnly OrderDate { get; set;  }
 
         //Navigation properties
         //public Customer? customer { get; set; }

@@ -12,47 +12,47 @@ namespace OrderManagementApp.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class CategoriesController : ControllerBase
+    public class OrderDetailsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
 
-        public CategoriesController(ApplicationDbContext context)
+        public OrderDetailsController(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        // GET: api/Categories
+        // GET: api/OrderDetails
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Category>>> GetCategories()
+        public async Task<ActionResult<IEnumerable<OrderDetail>>> GetOrderDetails()
         {
-            return await _context.Categories.ToListAsync();
+            return await _context.OrderDetails.ToListAsync();
         }
 
-        // GET: api/Categories/5
+        // GET: api/OrderDetails/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Category>> GetCategory(int id)
+        public async Task<ActionResult<OrderDetail>> GetOrderDetail(int id)
         {
-            var category = await _context.Categories.FindAsync(id);
+            var orderDetail = await _context.OrderDetails.FindAsync(id);
 
-            if (category == null)
+            if (orderDetail == null)
             {
                 return NotFound();
             }
 
-            return category;
+            return orderDetail;
         }
 
-        // PUT: api/Categories/5
+        // PUT: api/OrderDetails/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutCategory(int id, Category category)
+        public async Task<IActionResult> PutOrderDetail(int id, OrderDetail orderDetail)
         {
-            if (id != category.CategoryId)
+            if (id != orderDetail.OrderDetailId)
             {
                 return BadRequest();
             }
 
-            _context.Entry(category).State = EntityState.Modified;
+            _context.Entry(orderDetail).State = EntityState.Modified;
 
             try
             {
@@ -60,7 +60,7 @@ namespace OrderManagementApp.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!CategoryExists(id))
+                if (!OrderDetailExists(id))
                 {
                     return NotFound();
                 }
@@ -73,36 +73,36 @@ namespace OrderManagementApp.Controllers
             return NoContent();
         }
 
-        // POST: api/Categories
+        // POST: api/OrderDetails
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Category>> PostCategory(Category category)
+        public async Task<ActionResult<OrderDetail>> PostOrderDetail(OrderDetail orderDetail)
         {
-            _context.Categories.Add(category);
+            _context.OrderDetails.Add(orderDetail);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetCategory", new { id = category.CategoryId }, category);
+            return CreatedAtAction("GetOrderDetail", new { id = orderDetail.OrderDetailId }, orderDetail);
         }
 
-        // DELETE: api/Categories/5
+        // DELETE: api/OrderDetails/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCategory(int id)
+        public async Task<IActionResult> DeleteOrderDetail(int id)
         {
-            var category = await _context.Categories.FindAsync(id);
-            if (category == null)
+            var orderDetail = await _context.OrderDetails.FindAsync(id);
+            if (orderDetail == null)
             {
                 return NotFound();
             }
 
-            _context.Categories.Remove(category);
+            _context.OrderDetails.Remove(orderDetail);
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        private bool CategoryExists(int id)
+        private bool OrderDetailExists(int id)
         {
-            return _context.Categories.Any(e => e.CategoryId == id);
+            return _context.OrderDetails.Any(e => e.OrderDetailId == id);
         }
     }
 }

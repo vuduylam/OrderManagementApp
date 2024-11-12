@@ -47,7 +47,7 @@ namespace OrderManagementApp.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> PutCustomer(int id, Customer customer)
         {
-            if (id != customer.customer_id)
+            if (id != customer.CustomerId)
             {
                 return BadRequest();
             }
@@ -81,7 +81,7 @@ namespace OrderManagementApp.Controllers
             _context.Customers.Add(customer);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetCustomer", new { id = customer.customer_id }, customer);
+            return CreatedAtAction("GetCustomer", new { id = customer.CustomerId }, customer);
         }
 
         // DELETE: api/Customers/5
@@ -102,7 +102,7 @@ namespace OrderManagementApp.Controllers
 
         private bool CustomerExists(int id)
         {
-            return _context.Customers.Any(e => e.customer_id == id);
+            return _context.Customers.Any(e => e.CustomerId == id);
         }
     }
 }
