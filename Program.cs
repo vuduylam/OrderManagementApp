@@ -1,4 +1,6 @@
 
+using StackExchange.Redis;
+using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.EntityFrameworkCore;
 using OrderManagementApp.Data;
 
@@ -16,8 +18,19 @@ namespace OrderManagementApp
             {
                 options.UseNpgsql(builder.Configuration.GetConnectionString("Database"));
             });
+
+            builder.Services.AddStackExchangeRedisCache(options =>
+            {
+                //This property is set to specify the connection string for Redis
+                //The value is fetched from the application's configuration system, i.e., appsettings.json file
+                options.Configuration = builder.Configuration["RedisCacheOptions:Configuration"];
+                //This property helps in setting a logical name for the Redis cache instance. 
+                //The value is also fetched from the appsettings.json file
+                options.InstanceName = builder.Configuration["RedisCacheOptions:InstanceName"];
+            });
             builder.Services.AddControllers();
 
+            builder.Services.AddHttpClient();
 
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
