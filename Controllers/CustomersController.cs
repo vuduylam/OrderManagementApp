@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 using OrderManagementApp.Data;
 using OrderManagementApp.Models;
 
@@ -15,31 +17,85 @@ namespace OrderManagementApp.Controllers
     public class CustomersController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IDistributedCache _cache;
 
-        public CustomersController(ApplicationDbContext context)
+        public CustomersController(ApplicationDbContext context, IDistributedCache cache)
         {
             _context = context;
+            _cache = cache;
         }
 
         // GET: api/Customers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
         {
-            return await _context.Customers.ToListAsync();
+            var cacheKey = "all_customers";
+            List<Customer> customers;
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (cachedData != null)
+            {
+                //Deserialize cached data
+                customers = JsonSerializer.Deserialize<List<Customer>>(cachedData) ?? new List<Customer>();
+            }
+            else
+            {
+                // Fetch data from database
+                customers = await _context.Customers.ToListAsync();
+
+                if (customers == null)
+                {
+                    return StatusCode(StatusCodes.Status404NotFound);
+                }
+
+                if (customers != null)
+                {
+                    // Serialize data and cache it
+                    var serializedData = JsonSerializer.Serialize(customers);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+            }
+            return Ok(customers);
         }
 
         // GET: api/Customers/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Customer>> GetCustomer(int id)
         {
-            var customer = await _context.Customers.FindAsync(id);
+            var cacheKey = $"customer_{id}";
+            Customer? customer;
 
-            if (customer == null)
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (cachedData != null)
             {
-                return NotFound();
+                // Deserialize cached data
+                customer = JsonSerializer.Deserialize<Customer>(cachedData) ?? new Customer();
             }
+            else
+            {
+                // Fetch data from database
+                customer = await _context.Customers.FindAsync(id);
 
-            return customer;
+                if (customer == null)
+                {
+                    return NotFound();
+                }
+
+                if (customer != null)
+                {
+                    // Serialize data and cache it
+                    var serializedData = JsonSerializer.Serialize(customer);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+            }
+            return Ok(customer);
         }
 
         // PUT: api/Customers/5
