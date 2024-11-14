@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 using OrderManagementApp.Data;
 using OrderManagementApp.Models;
 
@@ -15,31 +17,85 @@ namespace OrderManagementApp.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IDistributedCache _cache;
 
-        public ProductsController(ApplicationDbContext context)
+        public ProductsController(ApplicationDbContext context, IDistributedCache cache)
         {
             _context = context;
+            _cache = cache;
         }
 
         // GET: api/Products
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetProduct()
         {
-            return await _context.Products.ToListAsync();
+            var cacheKey = "all_products";
+            List<Product> products;
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (cachedData != null)
+            {
+                //Deserialize cached data
+                products = JsonSerializer.Deserialize<List<Product>>(cachedData) ?? new List<Product>();
+            }
+            else
+            {
+                // Fetch data from database
+                products = await _context.Products.ToListAsync();
+
+                if (products == null)
+                {
+                    return StatusCode(StatusCodes.Status404NotFound);
+                }
+
+                if (products != null)
+                {
+                    // Serialize data and cache it
+                    var serializedData = JsonSerializer.Serialize(products);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+            }
+            return Ok(products);
         }
 
         // GET: api/Products/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Product>> GetProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
+            var cacheKey = $"product_{id}";
+            Product? product;
 
-            if (product == null)
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (cachedData != null)
             {
-                return NotFound();
+                // Deserialize cached data
+                product = JsonSerializer.Deserialize<Product>(cachedData) ?? new Product();
             }
+            else
+            {
+                // Fetch data from database
+                product = await _context.Products.FindAsync(id);
 
-            return product;
+                if (product == null)
+                {
+                    return NotFound();
+                }
+
+                if (product != null)
+                {
+                    // Serialize data and cache it
+                    var serializedData = JsonSerializer.Serialize(product);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+            }
+            return Ok(product);
         }
 
         // PUT: api/Products/5
