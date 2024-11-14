@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 using OrderManagementApp.Data;
 using OrderManagementApp.Models;
 
@@ -15,31 +17,85 @@ namespace OrderManagementApp.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IDistributedCache _cache;
 
-        public OrdersController(ApplicationDbContext context)
+        public OrdersController(ApplicationDbContext context, IDistributedCache cache)
         {
             _context = context;
+            _cache = cache;
         }
 
         // GET: api/Orders
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
         {
-            return await _context.Orders.ToListAsync();
+            var cacheKey = "all_orders";
+            List<Order> orders;
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (cachedData != null)
+            {
+                //Deserialize cached data
+                orders = JsonSerializer.Deserialize<List<Order>>(cachedData) ?? new List<Order>();
+            }
+            else
+            {
+                // Fetch data from database
+                orders = await _context.Orders.ToListAsync();
+
+                if (orders == null)
+                {
+                    return StatusCode(StatusCodes.Status404NotFound);
+                }
+
+                if (orders != null)
+                {
+                    // Serialize data and cache it
+                    var serializedData = JsonSerializer.Serialize(orders);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+            }
+            return Ok(orders);
         }
 
         // GET: api/Orders/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Order>> GetOrder(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
+            var cacheKey = $"order_{id}";
+            Order? order;
 
-            if (order == null)
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (cachedData != null)
             {
-                return NotFound();
+                // Deserialize cached data
+                order = JsonSerializer.Deserialize<Order>(cachedData) ?? new Order();
             }
+            else
+            {
+                // Fetch data from database
+                order = await _context.Orders.FindAsync(id);
 
-            return order;
+                if (order == null)
+                {
+                    return NotFound();
+                }
+
+                if (order != null)
+                {
+                    // Serialize data and cache it
+                    var serializedData = JsonSerializer.Serialize(order);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+            }
+            return Ok(order);
         }
 
         // PUT: api/Orders/5
