@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
+using System.Text.Json;
 using OrderManagementApp.Data;
 using OrderManagementApp.Models;
 
@@ -15,31 +17,79 @@ namespace OrderManagementApp.Controllers
     public class CategoriesController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-
-        public CategoriesController(ApplicationDbContext context)
+        private readonly IDistributedCache _cache;
+        public CategoriesController(ApplicationDbContext context, IDistributedCache cache)
         {
             _context = context;
+            _cache = cache;
         }
 
         // GET: api/Categories
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Category>>> GetCategories()
         {
-            return await _context.Categories.ToListAsync();
+            var cacheKey = "all_categories";
+            List<Category> categories;
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (cachedData != null)
+            {
+                //Deserialize cached data
+                categories = JsonSerializer.Deserialize<List<Category>>(cachedData) ?? new List<Category>();
+            }
+            else
+            {
+                // Fetch data from database
+                categories = await _context.Categories.ToListAsync();
+
+                if (categories != null)
+                {
+                    // Serialize data and cache it
+                    var serializedData = JsonSerializer.Serialize(categories);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+            }
+            return Ok(categories);
         }
 
         // GET: api/Categories/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Category>> GetCategory(int id)
         {
-            var category = await _context.Categories.FindAsync(id);
+            var cacheKey = $"category_{id}";
+            Category? category;
 
-            if (category == null)
+            var cachedData = await _cache.GetStringAsync(cacheKey);
+            if (cachedData != null)
             {
-                return NotFound();
+                // Deserialize cached data
+                category = JsonSerializer.Deserialize<Category>(cachedData) ?? new Category();
             }
+            else
+            {
+                // Fetch data from database
+                category = await _context.Categories.FindAsync(id);
 
-            return category;
+                if (category == null)
+                {
+                    return NotFound();
+                }
+
+                if (category != null)
+                {
+                    // Serialize data and cache it
+                    var serializedData = JsonSerializer.Serialize(category);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+            }
+            return Ok(category);
         }
 
         // PUT: api/Categories/5
