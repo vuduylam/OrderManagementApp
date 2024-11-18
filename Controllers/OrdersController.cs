@@ -112,7 +112,50 @@ namespace OrderManagementApp.Controllers
 
             try
             {
+                //UPDATE IN DATABASE
                 await _context.SaveChangesAsync();
+
+                //UPDATE IN CACHE
+                var cacheKeyId = $"order_{id}";
+                var cacheKeyAll = "all_orders";
+
+                var cachedDataId = await _cache.GetStringAsync(cacheKeyId);
+                var cachedDataAll = await _cache.GetStringAsync(cacheKeyAll);
+
+                //Cache Id
+                if (cachedDataId != null)
+                {
+                    //Delete old cache
+                    await _cache.RemoveAsync(cacheKeyId);
+
+                    //Create new cache
+                    var serializedData = JsonSerializer.Serialize(order);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKeyId, serializedData, cacheOptions);
+                }
+
+                //Cache All
+                if (cachedDataAll != null)
+                {
+                    //Delete old cache
+                    await _cache.RemoveAsync(cacheKeyAll);
+
+                    //Make the list to from old cache data and modify
+                    var orders = JsonSerializer.Deserialize<List<Order>>(cachedDataAll) ?? new List<Order>();
+
+                    orders.RemoveAll(c => c.OrderId == id);
+                    orders.Add(order);
+
+                    //Create new cache
+                    var serializedData = JsonSerializer.Serialize(orders);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+                    await _cache.SetStringAsync(cacheKeyAll, serializedData, cacheOptions);
+                }
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -134,10 +177,41 @@ namespace OrderManagementApp.Controllers
         [HttpPost]
         public async Task<ActionResult<Order>> PostOrder(Order order)
         {
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
+            try
+            {
+                //DATABASE
+                _context.Orders.Add(order);
+                await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetOrder", new { id = order.OrderId }, order);
+                //CACHE
+                var cacheKey = "all_orders";
+                var cacheData = await _cache.GetStringAsync(cacheKey);
+
+                if (cacheData != null) //Check if cache exists
+                {
+                    //Delete old cache
+                    await _cache.RemoveAsync(cacheKey);
+
+                    //Make a list from date of old cache and add a new category
+                    var orders = JsonSerializer.Deserialize<List<Order>>(cacheData) ?? new List<Order>();
+
+                    orders.Add(order);
+
+                    //Create new cache
+                    var serializedData = JsonSerializer.Serialize(orders);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+
+                return CreatedAtAction("GetOrder", new { id = order.OrderId }, order);
+            }
+            catch
+            {
+                return BadRequest();
+            }
+
         }
 
         // DELETE: api/Orders/5
@@ -150,8 +224,38 @@ namespace OrderManagementApp.Controllers
                 return NotFound();
             }
 
+            //Delete in database
             _context.Orders.Remove(order);
             await _context.SaveChangesAsync();
+
+            //Delete in cache
+            var cacheKeyId = $"order_{id}";
+            var cacheDataId = await _cache.GetStringAsync(cacheKeyId);
+
+            var cacheKeyAll = $"all_order";
+            var cacheDataAll = await _cache.GetStringAsync(cacheKeyAll);
+
+            if (cacheDataId != null)
+            {
+                await _cache.RemoveAsync(cacheKeyId);
+            }
+
+            if (cacheDataAll != null) 
+            {
+                await _cache.RemoveAsync(cacheKeyAll);
+                
+                var orders = JsonSerializer.Deserialize<List<Order>>(cacheDataAll) ?? new List<Order>();
+                
+                orders.RemoveAll(o => o.OrderId == id);
+
+                var serializedData = JsonSerializer.Serialize(orders);
+
+                var cacheOptions = new DistributedCacheEntryOptions()
+                   .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                await _cache.SetStringAsync(cacheKeyAll, serializedData, cacheOptions);
+
+            }
 
             return NoContent();
         }
