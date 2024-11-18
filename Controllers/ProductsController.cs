@@ -44,7 +44,7 @@ namespace OrderManagementApp.Controllers
 
                 if (products == null)
                 {
-                    return StatusCode(StatusCodes.Status404NotFound);
+                    return NotFound();
                 }
 
                 if (products != null)

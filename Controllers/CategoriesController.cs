@@ -106,7 +106,41 @@ namespace OrderManagementApp.Controllers
 
             try
             {
+                //Update database
                 await _context.SaveChangesAsync();
+                
+                //Update cache
+                var cacheKeyId = $"category_{id}";
+                var cacheKeyAll = "all_categories";
+
+                var cachedDataId = await _cache.GetStringAsync(cacheKeyId);
+                var cachedDataAll = await _cache.GetStringAsync(cacheKeyAll);
+
+                //Read old cache, delete in Redis and add the modified cache
+                if (cachedDataId != null)
+                {
+                    await _cache.RemoveAsync(cacheKeyId);
+                    var serializedData = JsonSerializer.Serialize(category);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKeyId, serializedData, cacheOptions);
+                }
+
+                if (cachedDataAll != null)
+                {
+                    await _cache.RemoveAsync(cacheKeyAll);
+                    var categories = JsonSerializer.Deserialize<List<Category>>(cachedDataAll) ?? new List<Category>();
+                    
+                    categories.Add(category);
+                    
+                    var serializedData = JsonSerializer.Serialize(categories);
+                    
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+                    await _cache.SetStringAsync(cacheKeyAll, serializedData,cacheOptions);
+                }
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -128,10 +162,37 @@ namespace OrderManagementApp.Controllers
         [HttpPost]
         public async Task<ActionResult<Category>> PostCategory(Category category)
         {
-            _context.Categories.Add(category);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.Categories.Add(category);
+                await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetCategory", new { id = category.CategoryId }, category);
+                var cacheKey = "all_categories";
+                var cacheData = await _cache.GetStringAsync(cacheKey);
+
+                //Read old cache, delete in Redis and add the modified cache
+                if (cacheData != null)
+                {
+                    await _cache.RemoveAsync(cacheKey);
+                    var categories = JsonSerializer.Deserialize<List<Category>>(cacheData) ?? new List<Category>();
+
+                    categories.Add(category);
+
+                    var serializedData = JsonSerializer.Serialize(categories);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                }
+
+
+                return CreatedAtAction("GetCategory", new { id = category.CategoryId }, category);
+            }
+            catch
+            {
+                return BadRequest();
+            }
+
         }
 
         // DELETE: api/Categories/5
@@ -144,8 +205,38 @@ namespace OrderManagementApp.Controllers
                 return NotFound();
             }
 
+            //Delete in database
             _context.Categories.Remove(category);
             await _context.SaveChangesAsync();
+
+            //Delete in cache
+            var cacheKeyId = $"category_{id}";
+            var cacheDataId = await _cache.GetStringAsync(cacheKeyId);
+
+            var cacheKeyAll = "all_categories";
+            var cacheDataAll = await _cache.GetStringAsync(cacheKeyAll);
+
+            //Delete cache_id if exists
+            if (cacheDataId != null)
+            {
+                await _cache.RemoveAsync(cacheKeyId);
+            }
+
+            //Read old cache, delete in Redis and add the modified cache for all
+            if (cacheDataAll != null)
+            {
+                await _cache.RemoveAsync(cacheKeyAll);
+                var categories = JsonSerializer.Deserialize<List<Category>>(cacheDataAll) ?? new List<Category>();
+
+                categories.RemoveAll(c => c.CategoryId == id);
+
+                var serializedData = JsonSerializer.Serialize(categories);
+
+                var cacheOptions = new DistributedCacheEntryOptions()
+                    .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+                
+                await _cache.SetStringAsync(cacheKeyAll, serializedData, cacheOptions);
+            }
 
             return NoContent();
         }
