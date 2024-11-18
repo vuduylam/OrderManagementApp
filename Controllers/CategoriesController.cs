@@ -173,7 +173,7 @@ namespace OrderManagementApp.Controllers
         {
             try
             {
-                //ADD DATABASE
+                //DATABASE
                 _context.Categories.Add(category);
                 await _context.SaveChangesAsync();
 
