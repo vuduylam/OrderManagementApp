@@ -106,20 +106,23 @@ namespace OrderManagementApp.Controllers
 
             try
             {
-                //Update database
+                //UPDATE DATABASE
                 await _context.SaveChangesAsync();
                 
-                //Update cache
+                //UPDATE CACHE
                 var cacheKeyId = $"category_{id}";
                 var cacheKeyAll = "all_categories";
 
                 var cachedDataId = await _cache.GetStringAsync(cacheKeyId);
                 var cachedDataAll = await _cache.GetStringAsync(cacheKeyAll);
 
-                //Read old cache, delete in Redis and add the modified cache
+                //Cache Id
                 if (cachedDataId != null)
                 {
+                    //Delete old cache
                     await _cache.RemoveAsync(cacheKeyId);
+
+                    //Create new cache
                     var serializedData = JsonSerializer.Serialize(category);
 
                     var cacheOptions = new DistributedCacheEntryOptions()
@@ -128,13 +131,19 @@ namespace OrderManagementApp.Controllers
                     await _cache.SetStringAsync(cacheKeyId, serializedData, cacheOptions);
                 }
 
+                //Cache All
                 if (cachedDataAll != null)
                 {
+                    //Delete old cache
                     await _cache.RemoveAsync(cacheKeyAll);
+
+                    //Make the list to from old cache data and modify
                     var categories = JsonSerializer.Deserialize<List<Category>>(cachedDataAll) ?? new List<Category>();
-                    
+
+                    categories.RemoveAll(c => c.CategoryId == id);
                     categories.Add(category);
                     
+                    //Create new cache
                     var serializedData = JsonSerializer.Serialize(categories);
                     
                     var cacheOptions = new DistributedCacheEntryOptions()
@@ -164,20 +173,25 @@ namespace OrderManagementApp.Controllers
         {
             try
             {
+                //ADD DATABASE
                 _context.Categories.Add(category);
                 await _context.SaveChangesAsync();
 
+                //CACHE
                 var cacheKey = "all_categories";
                 var cacheData = await _cache.GetStringAsync(cacheKey);
 
-                //Read old cache, delete in Redis and add the modified cache
-                if (cacheData != null)
+                if (cacheData != null) //Check if cache exists
                 {
+                    //Delete old cache
                     await _cache.RemoveAsync(cacheKey);
+
+                    //Make a list from date of old cache and add a new category
                     var categories = JsonSerializer.Deserialize<List<Category>>(cacheData) ?? new List<Category>();
 
                     categories.Add(category);
 
+                    //Create new cache
                     var serializedData = JsonSerializer.Serialize(categories);
 
                     var cacheOptions = new DistributedCacheEntryOptions()
@@ -192,7 +206,6 @@ namespace OrderManagementApp.Controllers
             {
                 return BadRequest();
             }
-
         }
 
         // DELETE: api/Categories/5
