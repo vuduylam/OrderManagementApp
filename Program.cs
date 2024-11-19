@@ -3,6 +3,8 @@ using StackExchange.Redis;
 using Microsoft.Extensions.Caching.StackExchangeRedis;
 using Microsoft.EntityFrameworkCore;
 using OrderManagementApp.Data;
+using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace OrderManagementApp
 {
@@ -29,6 +31,13 @@ namespace OrderManagementApp
                 options.InstanceName = builder.Configuration["RedisCacheOptions:InstanceName"];
             });
             builder.Services.AddControllers();
+
+            builder.Services.AddControllers().AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+            });
+
+
 
             builder.Services.AddHttpClient();
 
