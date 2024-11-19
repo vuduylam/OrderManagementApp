@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace OrderManagementApp.Models
 {
@@ -18,7 +19,9 @@ namespace OrderManagementApp.Models
         public int Quantity { get; set; }
 
         //Navigation properties
+        [JsonIgnore]
         public Order? Order { get; set; }
+        [JsonIgnore]
         public Product? Product { get; set; }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 using Microsoft.Build.Framework;
 
 namespace OrderManagementApp.Models
@@ -16,6 +17,7 @@ namespace OrderManagementApp.Models
         public DateOnly OrderDate { get; set;  }
 
         //Navigation properties
+        [JsonIgnore]
         public Customer? Customer { get; set; }
         public ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
     }

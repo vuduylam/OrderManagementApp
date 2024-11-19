@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace OrderManagementApp.Models
 {
@@ -22,6 +23,7 @@ namespace OrderManagementApp.Models
 
         //Navigation properties
         public ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
+        [JsonIgnore]
         public Category? Category { get; set; } = null!;
     }
 }
