@@ -9,6 +9,7 @@ using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using OrderManagementApp.Data;
 using OrderManagementApp.Models;
+using System.Text.Json.Serialization;
 
 namespace OrderManagementApp.Controllers
 {
@@ -40,7 +41,9 @@ namespace OrderManagementApp.Controllers
             else
             {
                 // Fetch data from database
-                customers = await _context.Customers.ToListAsync();
+                customers = await _context.Customers
+                    .Include(x => x.Orders)
+                    .ToListAsync();
 
                 if (customers == null)
                 {
@@ -87,6 +90,11 @@ namespace OrderManagementApp.Controllers
                 if (customer != null)
                 {
                     // Serialize data and cache it
+
+                    customer.Orders = await (from order in _context.Orders
+                                               where order.CustomerId == id
+                                               select order).ToListAsync();
+
                     var serializedData = JsonSerializer.Serialize(customer);
 
                     var cacheOptions = new DistributedCacheEntryOptions()

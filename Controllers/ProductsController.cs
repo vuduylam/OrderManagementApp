@@ -40,7 +40,9 @@ namespace OrderManagementApp.Controllers
             else
             {
                 // Fetch data from database
-                products = await _context.Products.ToListAsync();
+                products = await _context.Products
+                    .Include(product => product.OrderDetails.OrderBy(o => o.OrderDetailId))
+                    .ToListAsync();
 
 
 
@@ -88,6 +90,11 @@ namespace OrderManagementApp.Controllers
 
                 if (product != null)
                 {
+
+                    product.OrderDetails = await (from orderDetails in _context.OrderDetails
+                                             where orderDetails.ProductId == id
+                                             select orderDetails).ToListAsync();
+
                     // Serialize data and cache it
                     var serializedData = JsonSerializer.Serialize(product);
 
