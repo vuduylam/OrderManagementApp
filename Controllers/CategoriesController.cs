@@ -9,6 +9,10 @@ using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json;
 using OrderManagementApp.Data;
 using OrderManagementApp.Models;
+using Microsoft.EntityFrameworkCore.Internal;
+using Microsoft.CodeAnalysis.CSharp;
+using System.Text.Json.Serialization;
+using OrderManagementApp.DTOs;
 
 namespace OrderManagementApp.Controllers
 {
@@ -28,8 +32,8 @@ namespace OrderManagementApp.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Category>>> GetCategories()
         {
-            var cacheKey = "all_categories";
             List<Category> categories;
+            var cacheKey = "all_categories";
             var cachedData = await _cache.GetStringAsync(cacheKey);
             if (cachedData != null)
             {
@@ -39,11 +43,13 @@ namespace OrderManagementApp.Controllers
             else
             {
                 // Fetch data from database
-                categories = await _context.Categories.ToListAsync();
+                categories = await _context.Categories
+                    .Include(category => category.Products)
+                    .ToListAsync();
 
                 if (categories != null)
                 {
-                    // Serialize data and cache it
+                    //Serialize data and cache it
                     var serializedData = JsonSerializer.Serialize(categories);
 
                     var cacheOptions = new DistributedCacheEntryOptions()
@@ -73,6 +79,13 @@ namespace OrderManagementApp.Controllers
                 // Fetch data from database
                 category = await _context.Categories.FindAsync(id);
 
+                if (category != null)
+                {
+                    category.Products = await (from product in _context.Products
+                                               where product.CategoryId == id
+                                               select product).ToListAsync();
+                }
+
                 if (category == null)
                 {
                     return NotFound();
@@ -81,12 +94,12 @@ namespace OrderManagementApp.Controllers
                 if (category != null)
                 {
                     // Serialize data and cache it
-                    var serializedData = JsonSerializer.Serialize(category);
+                    //var serializedData = JsonSerializer.Serialize(category);
 
-                    var cacheOptions = new DistributedCacheEntryOptions()
-                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+                    //var cacheOptions = new DistributedCacheEntryOptions()
+                    //    .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
 
-                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                    //await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
                 }
             }
             return Ok(category);

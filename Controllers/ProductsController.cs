@@ -42,6 +42,8 @@ namespace OrderManagementApp.Controllers
                 // Fetch data from database
                 products = await _context.Products.ToListAsync();
 
+
+
                 if (products == null)
                 {
                     return NotFound();
