@@ -44,12 +44,18 @@ namespace OrderManagementApp.Controllers
             {
                 // Fetch data from database
                 categories = await _context.Categories
-                    .Include(category => category.Products)
+                    .Include(category => category.Products.OrderBy(p => p.ProductId))
                     .ToListAsync();
 
                 if (categories != null)
                 {
-                    //Serialize data and cache it
+                    ////Serialize data and cache it
+                    //var options = new JsonSerializerOptions
+                    //{
+                    //    ReferenceHandler = ReferenceHandler.Preserve
+                    //};
+
+                    //var serializedData = JsonSerializer.Serialize(categories, options);
                     var serializedData = JsonSerializer.Serialize(categories);
 
                     var cacheOptions = new DistributedCacheEntryOptions()
@@ -79,13 +85,6 @@ namespace OrderManagementApp.Controllers
                 // Fetch data from database
                 category = await _context.Categories.FindAsync(id);
 
-                if (category != null)
-                {
-                    category.Products = await (from product in _context.Products
-                                               where product.CategoryId == id
-                                               select product).ToListAsync();
-                }
-
                 if (category == null)
                 {
                     return NotFound();
@@ -93,13 +92,22 @@ namespace OrderManagementApp.Controllers
 
                 if (category != null)
                 {
-                    // Serialize data and cache it
-                    //var serializedData = JsonSerializer.Serialize(category);
+                    category.Products = await (from product in _context.Products
+                                               where product.CategoryId == id
+                                               select product).ToListAsync();
 
-                    //var cacheOptions = new DistributedCacheEntryOptions()
-                    //    .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+                    //Serialize data and cache it
+                    var options = new JsonSerializerOptions
+                    {
+                        ReferenceHandler = ReferenceHandler.Preserve
+                    };
 
-                    //await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                    var serializedData = JsonSerializer.Serialize(category, options);
+
+                    var cacheOptions = new DistributedCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
                 }
             }
             return Ok(category);
@@ -199,17 +207,18 @@ namespace OrderManagementApp.Controllers
                     //Delete old cache
                     await _cache.RemoveAsync(cacheKey);
 
-                    //Make a list from date of old cache and add a new category
-                    var categories = JsonSerializer.Deserialize<List<Category>>(cacheData) ?? new List<Category>();
+                    ////Make a list from date of old cache and add a new category
+                    //var categories = JsonSerializer.Deserialize<List<Category>>(cacheData) ?? new List<Category>();
 
-                    categories.Add(category);
+                    //categories.Add(category);
 
-                    //Create new cache
-                    var serializedData = JsonSerializer.Serialize(categories);
+                    ////Create new cache
 
-                    var cacheOptions = new DistributedCacheEntryOptions()
-                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
-                    await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
+                    //var serializedData = JsonSerializer.Serialize(categories);
+
+                    //var cacheOptions = new DistributedCacheEntryOptions()
+                    //    .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+                    //await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
                 }
 
 
@@ -252,16 +261,16 @@ namespace OrderManagementApp.Controllers
             if (cacheDataAll != null)
             {
                 await _cache.RemoveAsync(cacheKeyAll);
-                var categories = JsonSerializer.Deserialize<List<Category>>(cacheDataAll) ?? new List<Category>();
+                //    var categories = JsonSerializer.Deserialize<List<Category>>(cacheDataAll) ?? new List<Category>();
 
-                categories.RemoveAll(c => c.CategoryId == id);
+                //    categories.RemoveAll(c => c.CategoryId == id);
 
-                var serializedData = JsonSerializer.Serialize(categories);
+                //    var serializedData = JsonSerializer.Serialize(categories);
 
-                var cacheOptions = new DistributedCacheEntryOptions()
-                    .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
-                
-                await _cache.SetStringAsync(cacheKeyAll, serializedData, cacheOptions);
+                //    var cacheOptions = new DistributedCacheEntryOptions()
+                //        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
+
+                //    await _cache.SetStringAsync(cacheKeyAll, serializedData, cacheOptions);
             }
 
             return NoContent();
