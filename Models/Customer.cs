@@ -29,6 +29,6 @@ namespace OrderManagementApp.Models
         public string Country { get; set; } = string.Empty;
 
         //Navigation properties
-        public ICollection<Order> Orders { get; } = new List<Order>();
+        public ICollection<Order> Orders { get; set; } = new List<Order>();
     }
 }

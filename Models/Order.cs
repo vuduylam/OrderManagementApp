@@ -17,6 +17,6 @@ namespace OrderManagementApp.Models
 
         //Navigation properties
         public Customer? Customer { get; set; }
-        public ICollection<OrderDetail> OrderDetails { get; } = new List<OrderDetail>();
+        public ICollection<OrderDetail> OrderDetails { get; set; } = new List<OrderDetail>();
     }
 }
