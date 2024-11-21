@@ -13,6 +13,8 @@ using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Text.Json.Serialization;
 using OrderManagementApp.DTOs;
+using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.Blazor;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace OrderManagementApp.Controllers
 {
@@ -47,6 +49,48 @@ namespace OrderManagementApp.Controllers
                     .Include(category => category.Products.OrderBy(p => p.ProductId))
                     .ToListAsync();
 
+                var category_query = from c in _context.Categories
+                                     join p in _context.Products
+                                        on c.CategoryId equals p.CategoryId 
+                                        into category_product
+                                     from product in category_product.DefaultIfEmpty()
+                                     orderby c.CategoryId
+                                     select new
+                                     {
+                                         category_id = c.CategoryId,
+                                         category_name = c.CategoryName,
+                                         description = c.Description,
+                                         product
+                                         //product_id = test.ProductId,
+                                         //product_name = test.ProductName,
+                                         //unit = test.Unit,
+                                         //price = test.Price
+                                     };
+
+                                     //join od in _context.OrderDetails
+                                     //   on p.ProductId equals od.ProductId
+                                     //join o in _context.Orders
+                                     //   on od.OrderId equals o.OrderId
+                                     //orderby c.CategoryId
+                                     //select new
+                                     //{
+                                     //    c.CategoryId,
+                                     //    c.CategoryName,
+                                     //    c.Description,
+                                     //    p.ProductId,
+                                     //    p.ProductName,
+                                     //    p.Unit,
+                                     //    p.Price,
+                                         //od.OrderDetailId,
+                                         //od.OrderId,
+                                         //od.Quantity,
+                                         //o.CustomerId,
+                                         //o.OrderDate
+                                     //};
+
+                var _categories = await category_query.ToListAsync();
+
+                return Ok(_categories);
                 if (categories != null)
                 {
                     ////Serialize data and cache it
