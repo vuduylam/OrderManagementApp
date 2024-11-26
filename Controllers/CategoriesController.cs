@@ -15,6 +15,14 @@ using System.Text.Json.Serialization;
 using OrderManagementApp.DTOs;
 using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.Blazor;
 using static System.Net.Mime.MediaTypeNames;
+using Minio;
+using Minio.DataModel;
+using Microsoft.DotNet.Scaffolding.Shared.Messaging;
+using Minio.DataModel.Args;
+using System.Security.Cryptography.X509Certificates;
+using Minio.Exceptions;
+using System.Net;
+using System.IO;
 
 namespace OrderManagementApp.Controllers
 {
@@ -35,8 +43,10 @@ namespace OrderManagementApp.Controllers
         public async Task<ActionResult<IEnumerable<Category>>> GetCategories()
         {
             List<Category> categories;
+
             var cacheKey = "all_categories";
             var cachedData = await _cache.GetStringAsync(cacheKey);
+            
             if (cachedData != null)
             {
                 //Deserialize cached data
@@ -49,57 +59,8 @@ namespace OrderManagementApp.Controllers
                     .Include(category => category.Products.OrderBy(p => p.ProductId))
                     .ToListAsync();
 
-                var category_query = from c in _context.Categories
-                                     join p in _context.Products
-                                        on c.CategoryId equals p.CategoryId 
-                                        into category_product
-                                     from product in category_product.DefaultIfEmpty()
-                                     orderby c.CategoryId
-                                     select new
-                                     {
-                                         category_id = c.CategoryId,
-                                         category_name = c.CategoryName,
-                                         description = c.Description,
-                                         product
-                                         //product_id = test.ProductId,
-                                         //product_name = test.ProductName,
-                                         //unit = test.Unit,
-                                         //price = test.Price
-                                     };
-
-                                     //join od in _context.OrderDetails
-                                     //   on p.ProductId equals od.ProductId
-                                     //join o in _context.Orders
-                                     //   on od.OrderId equals o.OrderId
-                                     //orderby c.CategoryId
-                                     //select new
-                                     //{
-                                     //    c.CategoryId,
-                                     //    c.CategoryName,
-                                     //    c.Description,
-                                     //    p.ProductId,
-                                     //    p.ProductName,
-                                     //    p.Unit,
-                                     //    p.Price,
-                                         //od.OrderDetailId,
-                                         //od.OrderId,
-                                         //od.Quantity,
-                                         //o.CustomerId,
-                                         //o.OrderDate
-                                     //};
-
-                var _categories = await category_query.ToListAsync();
-
-                return Ok(_categories);
                 if (categories != null)
                 {
-                    ////Serialize data and cache it
-                    //var options = new JsonSerializerOptions
-                    //{
-                    //    ReferenceHandler = ReferenceHandler.Preserve
-                    //};
-
-                    //var serializedData = JsonSerializer.Serialize(categories, options);
                     var serializedData = JsonSerializer.Serialize(categories);
 
                     var cacheOptions = new DistributedCacheEntryOptions()
@@ -116,9 +77,11 @@ namespace OrderManagementApp.Controllers
         public async Task<ActionResult<Category>> GetCategory(int id)
         {
             var cacheKey = $"category_{id}";
+
             Category? category;
 
             var cachedData = await _cache.GetStringAsync(cacheKey);
+
             if (cachedData != null)
             {
                 // Deserialize cached data
@@ -127,7 +90,9 @@ namespace OrderManagementApp.Controllers
             else
             {
                 // Fetch data from database
-                category = await _context.Categories.FindAsync(id);
+                category = await _context.Categories
+                    .Include(category => category.Products.OrderBy(p => p.ProductId))
+                    .SingleOrDefaultAsync(category => category.CategoryId == id);
 
                 if (category == null)
                 {
@@ -136,10 +101,6 @@ namespace OrderManagementApp.Controllers
 
                 if (category != null)
                 {
-                    category.Products = await (from product in _context.Products
-                                               where product.CategoryId == id
-                                               select product).ToListAsync();
-
                     //Serialize data and cache it
                     var options = new JsonSerializerOptions
                     {
@@ -187,13 +148,6 @@ namespace OrderManagementApp.Controllers
                     //Delete old cache
                     await _cache.RemoveAsync(cacheKeyId);
 
-                    //Create new cache
-                    var serializedData = JsonSerializer.Serialize(category);
-
-                    var cacheOptions = new DistributedCacheEntryOptions()
-                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
-
-                    await _cache.SetStringAsync(cacheKeyId, serializedData, cacheOptions);
                 }
 
                 //Cache All
@@ -202,18 +156,6 @@ namespace OrderManagementApp.Controllers
                     //Delete old cache
                     await _cache.RemoveAsync(cacheKeyAll);
 
-                    //Make the list to from old cache data and modify
-                    var categories = JsonSerializer.Deserialize<List<Category>>(cachedDataAll) ?? new List<Category>();
-
-                    categories.RemoveAll(c => c.CategoryId == id);
-                    categories.Add(category);
-                    
-                    //Create new cache
-                    var serializedData = JsonSerializer.Serialize(categories);
-                    
-                    var cacheOptions = new DistributedCacheEntryOptions()
-                        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
-                    await _cache.SetStringAsync(cacheKeyAll, serializedData,cacheOptions);
                 }
             }
             catch (DbUpdateConcurrencyException)
@@ -230,6 +172,105 @@ namespace OrderManagementApp.Controllers
 
             return NoContent();
         }
+
+        [HttpGet("image")]
+        public async Task<IActionResult> GetImage(CancellationToken cancellationToken)
+        {
+            var _minioClient = new MinioClient()
+                .WithEndpoint("localhost:9000")
+                .WithCredentials("minioadmin", "minioadmin")
+                .WithSSL(false)
+                .Build();
+
+            try
+            {
+                // Define the object to retrieve
+                var bucketName = "vuduylam";
+                var objectName = "image.png";
+
+                StatObjectArgs statObjectArgs = new StatObjectArgs()
+                                    .WithBucket(bucketName)
+                                    .WithObject(objectName);
+                await _minioClient.StatObjectAsync(statObjectArgs);
+                var memoryStream = new MemoryStream();
+                GetObjectArgs getObjectArgs = new GetObjectArgs()
+                                                .WithBucket("vuduylam")
+                                                .WithObject("image.png")
+                                                .WithCallbackStream((stream) =>
+                                                {
+                                                    //stream.CopyTo(fileStream);
+                                                    stream.CopyTo(memoryStream);
+                                                });
+                await _minioClient.GetObjectAsync(getObjectArgs);
+                memoryStream.Seek(0, SeekOrigin.Begin);
+                return new FileStreamResult(memoryStream, "image/png")
+                {
+                    FileDownloadName = "test.png"
+                };
+            }
+            catch (MinioException e)
+            {
+                return BadRequest("Error occurred: " + e.Message);
+            }
+        }
+
+        [HttpPost("upload")]
+        public async Task<ActionResult> FileUpload(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest("No file uploaded.");
+            }
+
+            var _minioClient = new MinioClient()
+                .WithEndpoint("localhost:9000")
+                .WithCredentials("minioadmin","minioadmin")
+                .WithSSL(false)
+                .Build();
+
+            var bucketName = "vuduylam";  // The MinIO bucket name
+            var objectName = Path.GetFileName(file.FileName);  // Name of the object to upload
+            var contentType = file.ContentType;  // File content type
+
+            // Ensure the bucket exists
+            var bucketExistsArgs = new BucketExistsArgs().WithBucket(bucketName);
+            bool bucketExists = await _minioClient.BucketExistsAsync(bucketExistsArgs);
+            if (!bucketExists)
+            {
+                // If the bucket doesn't exist, create it
+                var makeBucketArgs = new MakeBucketArgs().WithBucket(bucketName);
+                await _minioClient.MakeBucketAsync(makeBucketArgs);
+            }
+
+            try
+            {
+                // Upload the file to MinIO
+                var putObjectArgs = new PutObjectArgs()
+                                     .WithBucket(bucketName)
+                                     .WithObject(objectName)
+                                     .WithStreamData(file.OpenReadStream())  // Use the stream of the file
+                                     .WithContentType(contentType)
+                                     .WithObjectSize(file.Length);
+
+                await _minioClient.PutObjectAsync(putObjectArgs);
+
+                
+                PresignedGetObjectArgs args = new PresignedGetObjectArgs()
+                    .WithBucket(bucketName)
+                    .WithExpiry(3600)
+                    .WithObject(objectName);
+
+                string url = await _minioClient.PresignedGetObjectAsync(args);
+
+
+                return Ok(url);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Error uploading file: {ex.Message}");
+            }
+        }
+
 
         // POST: api/Categories
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
@@ -251,20 +292,7 @@ namespace OrderManagementApp.Controllers
                     //Delete old cache
                     await _cache.RemoveAsync(cacheKey);
 
-                    ////Make a list from date of old cache and add a new category
-                    //var categories = JsonSerializer.Deserialize<List<Category>>(cacheData) ?? new List<Category>();
-
-                    //categories.Add(category);
-
-                    ////Create new cache
-
-                    //var serializedData = JsonSerializer.Serialize(categories);
-
-                    //var cacheOptions = new DistributedCacheEntryOptions()
-                    //    .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
-                    //await _cache.SetStringAsync(cacheKey, serializedData, cacheOptions);
                 }
-
 
                 return CreatedAtAction("GetCategory", new { id = category.CategoryId }, category);
             }
@@ -290,32 +318,10 @@ namespace OrderManagementApp.Controllers
 
             //Delete in cache
             var cacheKeyId = $"category_{id}";
-            var cacheDataId = await _cache.GetStringAsync(cacheKeyId);
-
             var cacheKeyAll = "all_categories";
-            var cacheDataAll = await _cache.GetStringAsync(cacheKeyAll);
-
-            //Delete cache_id if exists
-            if (cacheDataId != null)
-            {
-                await _cache.RemoveAsync(cacheKeyId);
-            }
-
-            //Read old cache, delete in Redis and add the modified cache for all
-            if (cacheDataAll != null)
-            {
-                await _cache.RemoveAsync(cacheKeyAll);
-                //    var categories = JsonSerializer.Deserialize<List<Category>>(cacheDataAll) ?? new List<Category>();
-
-                //    categories.RemoveAll(c => c.CategoryId == id);
-
-                //    var serializedData = JsonSerializer.Serialize(categories);
-
-                //    var cacheOptions = new DistributedCacheEntryOptions()
-                //        .SetAbsoluteExpiration(TimeSpan.FromMinutes(5));
-
-                //    await _cache.SetStringAsync(cacheKeyAll, serializedData, cacheOptions);
-            }
+ 
+            await _cache.RemoveAsync(cacheKeyId);
+            await _cache.RemoveAsync(cacheKeyAll);
 
             return NoContent();
         }

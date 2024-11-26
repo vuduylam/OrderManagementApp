@@ -5,6 +5,12 @@ using Microsoft.EntityFrameworkCore;
 using OrderManagementApp.Data;
 using System.Text.Json.Serialization;
 using System.Text.Json;
+using OrderManagementApp.Repositories;
+using OrderManagementApp.Interfaces;
+using OrderManagementApp.Helpers;
+
+using Minio;
+using Minio.DataModel.Args;
 
 namespace OrderManagementApp
 {
@@ -32,12 +38,26 @@ namespace OrderManagementApp
             });
             builder.Services.AddControllers();
 
+
+            var endpoint = "localhost:9000";
+            var accessKey = "minioadmin";
+            var secretKey = "minioadmin";
+
+            builder.Services.AddMinio(configureClient => configureClient
+            .WithEndpoint(endpoint)
+            .WithCredentials(accessKey, secretKey)
+            .Build());
+
+            builder.Services.AddMinio(accessKey, secretKey);
+
+
             //builder.Services.AddControllers().AddJsonOptions(options =>
             //{
             //    options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
             //});
+            builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
 
-
+            builder.Services.AddAutoMapper(typeof(MappingProfiles));
 
             builder.Services.AddHttpClient();
 
